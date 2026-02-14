@@ -99,7 +99,7 @@ def initialize():
 
     # 11. Wire up API routes
     from api.routes.health import router as health_router, init_routes
-    init_routes(config, risk_manager, exchange, trade_store)
+    init_routes(config, risk_manager, exchange, trade_store, orchestrator)
     app.include_router(health_router, prefix="/api")
 
     # 12. Startup summary

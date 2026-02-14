@@ -17,16 +17,18 @@ _risk_manager = None
 _exchange = None
 _config = None
 _trade_store = None
+_orchestrator = None
 _start_time = None
 
 
-def init_routes(config, risk_manager, exchange, trade_store):
+def init_routes(config, risk_manager, exchange, trade_store, orchestrator=None):
     """Initialize route dependencies."""
-    global _config, _risk_manager, _exchange, _trade_store, _start_time
+    global _config, _risk_manager, _exchange, _trade_store, _orchestrator, _start_time
     _config = config
     _risk_manager = risk_manager
     _exchange = exchange
     _trade_store = trade_store
+    _orchestrator = orchestrator
     _start_time = datetime.now(timezone.utc)
 
 
@@ -127,3 +129,23 @@ async def deactivate_kill_switch():
         _risk_manager.deactivate_kill_switch()
         return {"status": "kill_switch_deactivated"}
     return {"error": "Risk manager not initialized"}
+
+
+@router.get("/strategies")
+async def strategies_status():
+    """Get strategy orchestrator status including AI consensus."""
+    if not _orchestrator:
+        return {"error": "Orchestrator not initialized"}
+    return _orchestrator.get_status()
+
+
+@router.get("/ai/status")
+async def ai_consensus_status():
+    """Get AI consensus provider status and diagnostics."""
+    if not _orchestrator:
+        return {"error": "Orchestrator not initialized"}
+    status = _orchestrator.get_status()
+    ai = status.get("ai_consensus", {})
+    if not ai:
+        return {"error": "AI consensus strategy not enabled", "strategies": status.get("strategies", [])}
+    return ai

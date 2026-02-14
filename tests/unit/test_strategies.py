@@ -217,6 +217,7 @@ class TestOrchestrator:
         assert "momentum" in status["strategies"]
         assert "mean_reversion" in status["strategies"]
         assert "breakout" in status["strategies"]
+        assert "ai_consensus" in status["strategies"]
 
     def test_evaluate_returns_signal(self, orchestrator):
         candles = _make_candles([100] * 60)
@@ -242,6 +243,81 @@ class TestOrchestrator:
     def test_empty_candles_handled(self, orchestrator):
         result = orchestrator.evaluate("BTCUSDT", [])
         assert result.direction == SignalDirection.HOLD
+
+    def test_ai_consensus_in_status(self, orchestrator):
+        status = orchestrator.get_status()
+        # Should have AI consensus details if strategy is loaded
+        if "ai_consensus" in status["strategies"]:
+            assert "ai_consensus" in status
+
+
+# ============================================================================
+# AI CONSENSUS STRATEGY TESTS
+# ============================================================================
+
+class TestAIConsensusStrategy:
+    """Tests for the AI consensus strategy (without actual API calls)."""
+
+    @pytest.fixture
+    def strategy(self):
+        from core.strategy.ai_consensus import AIConsensusStrategy
+        config = load_config()
+        return AIConsensusStrategy(config)
+
+    def test_initialization(self, strategy):
+        status = strategy.get_status()
+        assert "providers_available" in status
+        assert "total_api_calls" in status
+        assert status["total_api_calls"] == 0
+
+    def test_insufficient_data_returns_hold(self, strategy):
+        candles = _make_candles([100] * 10)  # Only 10 candles, need 50
+        signal = strategy.analyze(candles, "BTCUSDT")
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_no_providers_returns_hold(self, strategy):
+        """Without API keys, strategy should safely return HOLD."""
+        candles = _make_candles([100] * 60)
+        signal = strategy.analyze(candles, "BTCUSDT")
+        # Without real API keys in test env, should get HOLD
+        assert signal.direction == SignalDirection.HOLD
+        assert signal.strategy == "ai_consensus"
+
+    def test_cache_clear(self, strategy):
+        strategy.clear_cache()
+        status = strategy.get_status()
+        assert status["cached_symbols"] == []
+
+    def test_prompt_builds_without_error(self, strategy):
+        candles = _make_candles(_trending_up(60))
+        prompt = strategy._build_prompt(candles, "BTCUSDT")
+        assert prompt is not None
+        assert "BTCUSDT" in prompt
+        assert "RSI" in prompt
+
+    def test_aggregation_logic(self, strategy):
+        from core.strategy.ai_consensus import ProviderDecision
+        decisions = [
+            ProviderDecision("openai", "buy", 0.8, "test", 0, 100),
+            ProviderDecision("gemini", "buy", 0.7, "test", 0, 100),
+            ProviderDecision("perplexity", "sell", 0.5, "test", 0, 100),
+        ]
+        result = strategy._aggregate(decisions, "BTCUSDT")
+        assert result.direction == "buy"  # 2 of 3 say buy
+        assert result.agreement_pct > 0.5
+
+    def test_unanimous_consensus(self, strategy):
+        from core.strategy.ai_consensus import ProviderDecision
+        decisions = [
+            ProviderDecision("openai", "buy", 0.9, "test", 0, 100),
+            ProviderDecision("gemini", "buy", 0.85, "test", 0, 100),
+            ProviderDecision("perplexity", "buy", 0.80, "test", 0, 100),
+        ]
+        result = strategy._aggregate(decisions, "ETHUSDT")
+        assert result.direction == "buy"
+        assert result.agreement_pct == 1.0
+        assert result.confidence > 0.7
+        assert result.is_strong
 
 
 # ============================================================================

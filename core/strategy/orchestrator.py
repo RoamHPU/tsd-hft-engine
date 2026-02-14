@@ -14,6 +14,7 @@ from core.strategy.base import BaseStrategy, Signal, SignalDirection
 from core.strategy.momentum import MomentumStrategy
 from core.strategy.mean_reversion import MeanReversionStrategy
 from core.strategy.breakout import BreakoutStrategy
+from core.strategy.ai_consensus import AIConsensusStrategy
 from data.ingestion.market_data import Candle
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,8 @@ class StrategyOrchestrator:
                 self._strategies[name] = MeanReversionStrategy(config)
             elif name == "breakout":
                 self._strategies[name] = BreakoutStrategy(config)
+            elif name == "ai_consensus":
+                self._strategies[name] = AIConsensusStrategy(config)
             else:
                 logger.warning(f"Unknown strategy: {name}")
 
@@ -200,7 +203,12 @@ class StrategyOrchestrator:
 
     def get_status(self) -> dict:
         """Get orchestrator status."""
-        return {
+        status = {
             "strategies": list(self._strategies.keys()),
             "weights": self._weights,
         }
+        # Include AI consensus status if available
+        ai = self._strategies.get("ai_consensus")
+        if ai and hasattr(ai, "get_status"):
+            status["ai_consensus"] = ai.get_status()
+        return status

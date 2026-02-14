@@ -89,15 +89,29 @@ trading_pairs:
 # --- Strategy Configuration ---
 strategies:
   enabled:
+    - "ai_consensus"
     - "momentum"
     - "mean_reversion"
     - "breakout"
   weights:
-    momentum: 0.40
-    mean_reversion: 0.35
-    breakout: 0.25
+    ai_consensus: 0.40                     # Dominant — AI-driven entry decisions
+    momentum: 0.25                         # Technical confirmation
+    mean_reversion: 0.20                   # Counter-trend detection
+    breakout: 0.15                         # Breakout capture
+  # AI consensus requires: OPENAI_API_KEY, GEMINI_API_KEY, PERPLEXITY_API_KEY in .env
   # Scalping and market making disabled until capital > $2000
   disabled_reason: "Insufficient capital for tight-spread strategies"
+
+# --- AI Consensus Settings ---
+ai_consensus:
+  cache_ttl_seconds: 300                   # 5 minutes between AI calls per symbol
+  min_providers: 2                         # Need at least 2 AI providers agreeing
+  min_confidence: 0.60                     # Minimum confidence to act
+  min_agreement: 0.50                      # Minimum provider agreement ratio
+  models:
+    openai: "gpt-4o-mini"                  # Cheapest viable — ~$0.15/1M input tokens
+    gemini: "gemini-2.0-flash"             # Free tier available, fast
+    perplexity: "sonar"                    # News-aware, real-time sentiment
 
 # --- Paper Trading ---
 paper_trading:
