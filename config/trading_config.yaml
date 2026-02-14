@@ -1,0 +1,155 @@
+# =============================================================================
+# TSD HFT ENGINE - MASTER TRADING CONFIGURATION
+# Single source of truth. All modules read from here.
+# =============================================================================
+# LAST REVIEWED: 2026-02-14
+# CAPITAL BASIS: $473.45 USDT
+# =============================================================================
+
+# --- Exchange Configuration ---
+exchange:
+  name: "binance"
+  base_url: "https://api.binance.com"    # .com for international, .us for US
+  use_testnet: false
+  rate_limits:
+    requests_per_minute: 1200
+    orders_per_second: 10
+    orders_per_day: 200000
+
+# --- Capital & Allocation ---
+capital:
+  total_usdt: 473.45                      # Actual capital - UPDATE THIS
+  max_allocation_pct: 80                  # Never deploy more than 80% of total
+  deployable_usdt: 378.76                 # Auto-calculated: total * max_allocation
+  reserve_usdt: 94.69                     # Always keep 20% in reserve
+  min_reserve_pct: 20                     # Hard floor - never breach this
+
+# --- Position Sizing (calibrated for ~$473) ---
+positions:
+  max_concurrent: 8                       # Realistic for this capital level
+  min_position_usdt: 15.00                # Binance minimums + buffer
+  max_position_usdt: 50.00                # ~10% of capital ceiling
+  max_position_pct: 10                    # Max % of total capital per position
+  default_position_pct: 5                 # Default sizing: ~$23.67
+
+# --- Risk Management (NON-NEGOTIABLE) ---
+risk:
+  # Per-trade limits
+  stop_loss_pct: 1.5                      # Exit at 1.5% loss
+  take_profit_pct: 2.0                    # Target 2.0% gain
+  trailing_stop_enabled: false            # Enable once strategy is validated
+  trailing_stop_pct: 1.0
+
+  # Daily limits
+  daily_loss_limit_pct: 5.0              # Max 5% portfolio loss per day (~$23.67)
+  daily_loss_limit_usdt: 23.67           # Hard USD limit
+  max_trades_per_day: 200                # Rate limit for sanity
+  consecutive_loss_halt: 5               # Stop after 5 consecutive losses
+
+  # Kill switch
+  kill_switch_enabled: true
+  kill_switch_drawdown_pct: 10.0         # Emergency stop at 10% drawdown (~$47.35)
+  kill_switch_drawdown_usdt: 47.35
+
+  # Exposure limits
+  max_single_asset_pct: 20               # No more than 20% in one asset
+  max_correlated_exposure_pct: 40        # Limit correlated positions
+
+# --- Fee Structure (Binance VIP0) ---
+fees:
+  spot:
+    maker_pct: 0.10
+    taker_pct: 0.10
+  futures:
+    maker_pct: 0.02
+    taker_pct: 0.04
+  bnb_discount_pct: 25                   # 25% fee discount when paying with BNB
+  use_bnb_for_fees: true
+  # Breakeven: round-trip cost = 0.20% (spot) → need >0.20% move to profit
+  min_profit_threshold_pct: 0.30         # Don't trade unless expected profit > fees + buffer
+
+# --- Trading Pairs (ranked by liquidity & spread quality) ---
+trading_pairs:
+  tier_1:                                 # Primary - tightest spreads
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "BNBUSDT"
+  tier_2:                                 # Secondary - good liquidity
+    - "SOLUSDT"
+    - "XRPUSDT"
+    - "ADAUSDT"
+    - "DOGEUSDT"
+  tier_3:                                 # Tertiary - wider spreads, more opportunity
+    - "LINKUSDT"
+    - "DOTUSDT"
+    - "AVAXUSDT"
+    - "MATICUSDT"
+    - "ATOMUSDT"
+
+# --- Strategy Configuration ---
+strategies:
+  enabled:
+    - "momentum"
+    - "mean_reversion"
+    - "breakout"
+  weights:
+    momentum: 0.40
+    mean_reversion: 0.35
+    breakout: 0.25
+  # Scalping and market making disabled until capital > $2000
+  disabled_reason: "Insufficient capital for tight-spread strategies"
+
+# --- Paper Trading ---
+paper_trading:
+  enabled: true                           # START IN PAPER MODE - go live only after validation
+  initial_capital: 473.45
+  track_slippage: true
+  simulated_slippage_bps: 5              # 5 basis points simulated slippage
+  simulated_latency_ms: 50              # 50ms simulated latency
+
+# --- Data Ingestion ---
+data:
+  price_feed: "websocket"                # websocket or rest_polling
+  websocket_streams:
+    - "ticker"
+    - "kline_1m"
+    - "depth20"
+  rest_polling_interval_sec: 10          # Fallback if websocket disconnects
+  coingecko_enabled: true
+  coingecko_api: "pro"                   # pro tier for better rate limits
+  history_candles: 200                   # Candles to load for indicator calculation
+
+# --- Evaluation Metrics ---
+evaluation:
+  cycle_interval_seconds: 60             # Seconds between evaluation cycles
+  track_metrics:
+    - "sharpe_ratio"
+    - "sortino_ratio"
+    - "win_rate"
+    - "profit_factor"
+    - "max_drawdown"
+    - "avg_trade_duration"
+    - "daily_pnl"
+    - "total_fees_paid"
+  min_sharpe_for_live: 1.5              # Don't go live unless Sharpe > 1.5
+  evaluation_window_days: 30            # Evaluate over rolling 30-day window
+  min_trades_for_evaluation: 100        # Need 100+ trades before metrics are meaningful
+
+# --- Logging & Audit ---
+logging:
+  level: "INFO"
+  trade_log: true                        # Log every trade decision
+  risk_log: true                         # Log every risk check
+  audit_trail: true                      # Full audit trail for compliance
+  log_to_file: true
+  log_to_db: true
+  max_log_size_mb: 100
+
+# --- Deployment ---
+deployment:
+  environment: "development"             # development | staging | production
+  host: "0.0.0.0"
+  port: 8000
+  workers: 2
+  aws_region: "ap-southeast-2"
+  health_check_interval_sec: 60
